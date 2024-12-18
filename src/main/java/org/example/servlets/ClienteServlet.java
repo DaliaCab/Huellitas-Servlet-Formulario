@@ -5,10 +5,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import org.example.Credentials;
 
 public class ClienteServlet extends HttpServlet {
@@ -31,11 +30,12 @@ public class ClienteServlet extends HttpServlet {
         String contrasena = request.getParameter("contrasena");
         String fechaNacimiento = request.getParameter("fechaNacimiento");
         String correo = request.getParameter("correo");
-        String telefono = request.getParameter("telefono");
+        long telefono = Long.parseLong(request.getParameter("telefono"));
         String fechaAfiliacion = request.getParameter("fechaAfiliacion");
 
-        // Conectar a la base de datos y ejecutar la inserción usando los valores de Credentials
+        // Conectar a la base de datos y registrar cliente
         try (Connection connection = DriverManager.getConnection(Credentials.JDBC_URL, Credentials.USERNAME, Credentials.PASSWORD)) {
+            // Insertar cliente
             String query = "INSERT INTO cliente (IDCliente, nombre, apellido, contrasena, fechaNacimiento, correo, telefono, fechaAfiliacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement pstmt = connection.prepareStatement(query)) {
                 pstmt.setInt(1, idCliente);
@@ -44,23 +44,42 @@ public class ClienteServlet extends HttpServlet {
                 pstmt.setString(4, contrasena);
                 pstmt.setDate(5, java.sql.Date.valueOf(fechaNacimiento));
                 pstmt.setString(6, correo);
-                pstmt.setString(7, telefono);
+                pstmt.setLong(7, telefono);
                 pstmt.setDate(8, java.sql.Date.valueOf(fechaAfiliacion));
                 pstmt.executeUpdate();
+            }
+
+            // Obtener todos los clientes
+            String selectQuery = "SELECT * FROM cliente";
+            try (PreparedStatement pstmt = connection.prepareStatement(selectQuery);
+                 ResultSet rs = pstmt.executeQuery()) {
+
+                // Generar tabla HTML
+                response.setContentType("text/html");
+                response.getWriter().println("<h1>Cliente registrado exitosamente</h1>");
+                response.getWriter().println("<h2>Lista de Clientes</h2>");
+                response.getWriter().println("<table border='1' style='width:100%;text-align:left;'>");
+                response.getWriter().println("<tr><th>ID</th><th>Nombre</th><th>Apellido</th><th>Correo</th><th>Teléfono</th></tr>");
+                while (rs.next()) {
+                    response.getWriter().println("<tr>");
+                    response.getWriter().println("<td>" + rs.getInt("IDCliente") + "</td>");
+                    response.getWriter().println("<td>" + rs.getString("nombre") + "</td>");
+                    response.getWriter().println("<td>" + rs.getString("apellido") + "</td>");
+                    response.getWriter().println("<td>" + rs.getString("correo") + "</td>");
+                    response.getWriter().println("<td>" + rs.getLong("telefono") + "</td>");
+                    response.getWriter().println("</tr>");
+                }
+                response.getWriter().println("</table>");
             }
         } catch (SQLException e) {
             e.printStackTrace();
             response.getWriter().println("Error al registrar cliente: " + e.getMessage());
-            return;
         }
-
-        // Respuesta de éxito
-        response.getWriter().println("Cliente registrado exitosamente.");
     }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // Lógica para manejar una solicitud GET
+        // Formulario de registro
         response.setContentType("text/html");
         response.getWriter().println("<h1>Formulario de Registro de Cliente</h1>");
         response.getWriter().println("<form method='POST'>");
